@@ -1,147 +1,259 @@
-<?php
-$db_host = 'localhost';
-$db_name = 'u490880839_7xii0';
-$db_user = 'u490880839_7ZrhP';
-$db_pass = '&Senha121&';
-$charset = 'utf8mb4';
-// --- 2. PEGAR E LOGAR OS DADOS ---
-$json_dados = file_get_contents('php://input');
-$dados = json_decode($json_dados, true);
-$log_file = __DIR__ . '/log_webhook.txt';
+<?php 
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
-$log_message = "========================================\n";
-$log_message .= "Recebido em: " . date('Y-m-d H:i:s') . "\n";
-
-// Se não houver dados, para aqui.
-if (!$dados) {
-    $log_message .= "AVISO: Nenhum dado recebido no 'php://input'.\n\n";
-    file_put_contents($log_file, $log_message, FILE_APPEND);
-    http_response_code(400); // Bad Request
-    echo json_encode(['error' => 'No data']);
-    exit;
-}
-
-$log_message .= print_r($dados, true) . "\n";
+/**
+ * ===================================================================
+ * CONFIGURAÇÕES DO BANCO DE DADOS
+ * !! TROQUE ESTA SENHA IMEDIATAMENTE !!
+ * ===================================================================
+ */
+$db_config = [
+    'host' => 'localhost',
+    'name' => 'u490880839_7xii0',
+    'user' => 'u490880839_7ZrhP',
+    'pass' => '&Senha121&', // <-- TROQUE A SENHA!
+    'charset' => 'utf8mb4'
+];
+// ===================================================================
 
 
-// --- 3. EXTRAIR OS DADOS PRINCIPAIS ---
-$phone = $dados['phone'] ?? null;
-$connectedPhone = $dados['connectedPhone'] ?? null;
-$messageId = $dados['messageId'] ?? null;
-$senderName = $dados['senderName'] ?? null;
-$apiTimestamp = $dados['momment'] ?? null;
-
-// --- 4. ROTEADOR DE TIPO DE MENSAGEM ---
-$message = null; // Texto ou Legenda
-$media_type = null; // Tipo da mídia (ex: image/jpeg)
-$media_download_url = null; // URL para baixar
-$media_url_for_db = null; // Caminho que vamos salvar no DB
-
-if (isset($dados['text']) && is_array($dados['text']) && isset($dados['text']['message'])) {
-    // --- É MENSAGEM DE TEXTO ---
-    $message = $dados['text']['message'];
-    $media_type = 'text';
-    $log_message .= "INFO: Mensagem de TEXTO detectada.\n";
-
-} elseif (isset($dados['image']) && is_array($dados['image'])) {
-    // --- É IMAGEM ---
-    $message = $dados['image']['caption'] ?? null; // Pega a legenda
-    $media_type = $dados['image']['mimeType'];
-    $media_download_url = $dados['image']['imageUrl'];
-    $log_message .= "INFO: Mídia de IMAGEM detectada.\n";
-
-} elseif (isset($dados['audio']) && is_array($dados['audio'])) {
-    // --- É ÁUDIO ---
-    $message = null; // Áudio não tem legenda
-    $media_type = $dados['audio']['mimeType'];
-    $media_download_url = $dados['audio']['audioUrl'];
-    $log_message .= "INFO: Mídia de ÁUDIO detectada.\n";
-
-} elseif (isset($dados['video']) && is_array($dados['video'])) {
-    // --- É VÍDEO (NOVO BLOCO) ---
-    $message = $dados['video']['caption'] ?? null; // Pega a legenda
-    $media_type = $dados['video']['mimeType'];
-    $media_download_url = $dados['video']['videoUrl'];
-    $log_message .= "INFO: Mídia de VÍDEO detectada.\n";
+/**
+ * ===================================================================
+ * NOVA FUNÇÃO "MESTRE" INTELIGENTE
+ * Ela reconhece o tipo de mensagem e chama a função correta.
+ * ===================================================================
+ */
+function enviarMensagem($phone, $message_or_url, $caption = null, $api_config, $db_config)
+{
+    echo "<h1>Disparando Mensagem...</h1>";
     
-} else {
-    // --- OUTRO TIPO (ex: status, documento, etc.) ---
-    $log_message .= "AVISO: Tipo de mensagem não suportado. Ignorando.\n\n";
-    file_put_contents($log_file, $log_message, FILE_APPEND);
-    http_response_code(200);
-    echo json_encode(['status' => 'received_unsupported_type']);
-    exit;
-}
+    // Listas de extensões conhecidas
+    $image_exts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    $video_exts = ['mp4', 'mov', '3gp', 'mkv'];
+    $audio_exts = ['ogg', 'mp3', 'aac', 'opus', 'wav', 'm4a'];
 
-// --- 5. BAIXAR A MÍDIA (Se houver) ---
-// (Este bloco não precisa mudar, ele é genérico e funciona)
-if ($media_download_url) {
-    
-    // Pega a extensão do arquivo (jpg, ogg, mp4, etc.)
-    $file_extension = pathinfo($media_download_url, PATHINFO_EXTENSION);
-    if (empty($file_extension)) { 
-        $file_extension = explode('/', explode(';', $media_type)[0])[1] ?? 'dat';
-    }
-
-    $new_filename = $messageId . '.' . $file_extension;
-    $save_path_on_server = __DIR__ . '/uploads/' . $new_filename;
-    
-    $file_data = @file_get_contents($media_download_url);
-    
-    if ($file_data === false) {
-        $log_message .= "ERRO: Falha ao baixar o arquivo de: $media_download_url\n";
-    } else {
-        file_put_contents($save_path_on_server, $file_data);
+    // 1. Verifica se é uma URL (http:// ou https://)
+    if (strpos(strtolower($message_or_url), 'http://') === 0 || strpos(strtolower($message_or_url), 'https://') === 0) {
         
-        $media_url_for_db = '/api_whatsapp/uploads/' . $new_filename; 
-        $log_message .= "SUCESSO: Mídia salva em: $save_path_on_server\n";
+        // É uma URL. Vamos descobrir o tipo pela extensão
+        $ext = strtolower(pathinfo($message_or_url, PATHINFO_EXTENSION));
+
+        if (in_array($ext, $image_exts)) {
+            // É Imagem
+            echo "<h2>Reconhecido: IMAGEM</h2>";
+            return enviaImagem($phone, $message_or_url, $caption, $api_config, $db_config);
+            
+        } elseif (in_array($ext, $video_exts)) {
+            // É Vídeo
+            echo "<h2>Reconhecido: VÍDEO</h2>";
+            return enviaVideo($phone, $message_or_url, $caption, $api_config, $db_config);
+            
+        } elseif (in_array($ext, $audio_exts)) {
+            // É Áudio
+            echo "<h2>Reconhecido: ÁUDIO</h2>";
+            // Áudio não tem legenda (caption) na API do Z-API
+            return enviaAudio($phone, $message_or_url, $api_config, $db_config);
+            
+        } else {
+            // URL de um tipo desconhecido (PDF, DOCX, etc.)
+            echo "<h2>Reconhecido: ARQUIVO (não suportado)</h2>";
+            $text_message = "Te enviei um arquivo que não consigo processar, aqui está o link: " . $message_or_url;
+            return enviaTexto($phone, $text_message, $api_config, $db_config);
+        }
+
+    } else {
+        // 2. Não é uma URL, então é texto.
+        echo "<h2>Reconhecido: TEXTO</h2>";
+        return enviaTexto($phone, $message_or_url, $api_config, $db_config);
     }
 }
 
 
-// --- 6. CONECTAR E INSERIR NO BANCO ---
-// (Este bloco também não precisa mudar)
-$dsn = "mysql:host=$db_host;dbname=$db_name;charset=$charset";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
+/**
+ * ===================================================================
+ * FUNÇÕES "TRABALHADORAS" (Texto, Imagem, Áudio, Vídeo)
+ * (Estas funções agora são chamadas pela função 'enviarMensagem')
+ * ===================================================================
+ */
+
+// --- 1. ENVIAR TEXTO ---
+function enviaTexto($phone, $message, $api_config, $db_config)
+{
+    $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-text';
+    $payload = ['phone' => $phone, 'message' => $message];
+    $resultado = callZApi($api_url, $api_config['token_security'], $payload);
+    $resposta_array = json_decode($resultado, true);
+    if (isset($resposta_array['zaapId'])) {
+        echo salvarEnvioNoDB($db_config, $resposta_array, $api_config['seu_telefone_conectado'], $phone, $message, 'text', null);
+    }
+    return $resultado;
+}
+
+// --- 2. ENVIAR IMAGEM ---
+function enviaImagem($phone, $public_image_url, $caption, $api_config, $db_config)
+{
+    $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-image'; 
+    $payload = ['phone' => $phone, 'image' => $public_image_url, 'caption' => $caption];
+    $resultado = callZApi($api_url, $api_config['token_security'], $payload);
+    $resposta_array = json_decode($resultado, true);
+    echo "<strong>DEBUG (enviaImagem): Resposta completa da API:</strong> " . htmlspecialchars($resultado) . "<hr>";
+    if (isset($resposta_array['zaapId'])) {
+        echo salvarEnvioNoDB($db_config, $resposta_array, $api_config['seu_telefone_conectado'], $phone, $caption, 'image/jpeg', $public_image_url);
+    }
+    return $resultado;
+}
+
+// --- 3. ENVIAR ÁUDIO ---
+function enviaAudio($phone, $public_audio_url, $api_config, $db_config)
+{
+    $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-audio'; 
+    $payload = ['phone' => $phone, 'audio' => $public_audio_url];
+    $resultado = callZApi($api_url, $api_config['token_security'], $payload);
+    $resposta_array = json_decode($resultado, true);
+    echo "<strong>DEBUG (enviaAudio): Resposta completa da API:</strong> " . htmlspecialchars($resultado) . "<hr>";
+    if (isset($resposta_array['zaapId'])) {
+        echo salvarEnvioNoDB($db_config, $resposta_array, $api_config['seu_telefone_conectado'], $phone, null, 'audio/ogg', $public_audio_url);
+    }
+    return $resultado;
+}
+
+// --- 4. ENVIAR VÍDEO ---
+function enviaVideo($phone, $public_video_url, $caption, $api_config, $db_config)
+{
+    $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-video'; 
+    $payload = ['phone' => $phone, 'video' => $public_video_url, 'caption' => $caption];
+    $resultado = callZApi($api_url, $api_config['token_security'], $payload);
+    $resposta_array = json_decode($resultado, true);
+    echo "<strong>DEBUG (enviaVideo): Resposta completa da API:</strong> " . htmlspecialchars($resultado) . "<hr>";
+    if (isset($resposta_array['zaapId'])) {
+        echo salvarEnvioNoDB($db_config, $resposta_array, $api_config['seu_telefone_conectado'], $phone, $caption, 'video/mp4', $public_video_url);
+    }
+    return $resultado;
+}
+
+
+/**
+ * ===================================================================
+ * FUNÇÕES AUXILIARES (cURL e Salvar no DB)
+ * (Sem alterações)
+ * ===================================================================
+ */
+
+function callZApi($api_url, $token, $payload)
+{
+    $jsonData = json_encode($payload);
+    $curl = curl_init();
+    curl_setopt_array($curl, array(
+        CURLOPT_URL            => $api_url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING       => "",
+        CURLOPT_MAXREDIRS      => 10,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST  => "POST",
+        CURLOPT_POSTFIELDS     => $jsonData,
+        CURLOPT_HTTPHEADER     => array(
+            "client-token: $token",
+            "content-type: application/json"
+        ),
+        CURLOPT_SSL_VERIFYPEER => false,
+    ));
+    $response = curl_exec($curl);
+    $err      = curl_error($curl);
+    curl_close($curl);
+    if ($err) {
+        return json_encode(['error' => 'cURL Error', 'message' => $err]);
+    } else {
+        return $response;
+    }
+}
+
+function salvarEnvioNoDB($db_config, $api_response, $sender_phone, $receiver_phone, $message_text, $media_type, $media_url)
+{
+    $dsn = "mysql:host={$db_config['host']};dbname={$db_config['name']};charset={$db_config['charset']}";
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ];
+    try {
+        $pdo = new PDO($dsn, $db_config['user'], $db_config['pass'], $options);
+        $message_id = $api_response['zaapId'] ?? 'envio-' . microtime(true);
+        $sender_name = "Você (Sistema)";
+        $api_timestamp = round(microtime(true) * 1000);
+        $sql = "INSERT IGNORE INTO whatsapp_messages 
+                    (message_id, sender_phone, receiver_phone, message_text, sender_name, api_timestamp, media_type, media_url)
+                VALUES 
+                    (:message_id, :sender_phone, :receiver_phone, :message_text, :sender_name, :api_timestamp, :media_type, :media_url)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'message_id' => $message_id,
+            'sender_phone' => $sender_phone,
+            'receiver_phone' => $receiver_phone,
+            'message_text' => $message_text,
+            'sender_name' => $sender_name,
+            'api_timestamp' => $api_timestamp,
+            'media_type' => $media_type,
+            'media_url' => $media_url
+        ]);
+        return "<h3 style='color:green;'>Mensagem ENVIADA salva no banco com sucesso!</h3>";
+    } catch (\PDOException $e) {
+        return "<h3 style='color:red;'>ERRO AO SALVAR NO BANCO: " . $e->getMessage() . "</h3>";
+    }
+}
+
+
+/**
+ * ===================================================================
+ * BLOCO DE TESTE (ATUALIZADO)
+ * Agora usamos apenas a nova função 'enviarMensagem'
+ * ===================================================================
+ */
+
+// 1. Defina os dados da sua API
+$api_config = [
+    'base_url' => 'https://api.z-api.io/instances/3E93D7FC741B61AF08719E400CFFE64E',
+    'token_url' => '/token/DD42686BD48BB58A1D9D412D',
+    'token_security' => 'F7a1f9dcc50a94d12aa5f8b4db10a6b78S', 
+    'seu_telefone_conectado' => '5521965368839' // O número do SEU celular
 ];
 
-try {
-    $pdo = new PDO($dsn, $db_user, $db_pass, $options);
-    $log_message .= "INFO: Conexão com DB OK.\n";
+$telefone_para_teste = '5521992491608'; // O número do CLIENTE
 
-    $sql = "INSERT IGNORE INTO whatsapp_messages 
-                (message_id, sender_phone, receiver_phone, message_text, sender_name, api_timestamp, media_type, media_url)
-            VALUES 
-                (:message_id, :sender_phone, :receiver_phone, :message_text, :sender_name, :api_timestamp, :media_type, :media_url)";
-    
-    $stmt = $pdo->prepare($sql);
-    
-    $stmt->execute([
-        'message_id' => $messageId,
-        'sender_phone' => $phone,
-        'receiver_phone' => $connectedPhone,
-        'message_text' => $message, // Salva o texto OU a legenda
-        'sender_name' => $senderName,
-        'api_timestamp' => $apiTimestamp,
-        'media_type' => $media_type,
-        'media_url' => $media_url_for_db
-    ]);
 
-    $log_message .= "SUCESSO: Mensagem inserida no DB.\n\n";
-    
-    http_response_code(200);
-    echo json_encode(['status' => 'received_and_saved']);
+// --- ESCOLHA QUAL TESTE RODAR (descomente um bloco de cada vez) ---
 
-} catch (\PDOException $e) {
-    $log_message .= "ERRO DE BANCO DE DADOS: " . $e->getMessage() . "\n\n";
-    http_response_code(500); 
-    echo json_encode(['error' => 'Database operation failed']);
-}
+// --- TESTE DE TEXTO ---
+/*  $mensagem = "Este é um teste de TEXTO com a função inteligente. " . date('H:i:s');
+ $legenda = null;
+ $resultado = enviarMensagem($telefone_para_teste, $mensagem, $legenda, $api_config, $db_config); */
 
-// --- 7. SALVAR O LOG NO ARQUIVO ---
-file_put_contents($log_file, $log_message, FILE_APPEND);
+
+
+// --- TESTE DE IMAGEM ---
+/* $mensagem = 'https://studio401.com.br/api_whatsapp/uploads/Teste2.png';
+$legenda = 'Teste de IMAGEM com a função inteligente. ' . date('H:i:s');
+$resultado = enviarMensagem($telefone_para_teste, $mensagem, $legenda, $api_config, $db_config); */
+
+
+
+// --- TESTE DE VÍDEO ---
+$mensagem = 'https://studio401.com.br/api_whatsapp/video1.mp4';
+$legenda = 'Teste de VÍDEO com a função inteligente. ' . date('H:i:s');
+$resultado = enviarMensagem($telefone_para_teste, $mensagem, $legenda, $api_config, $db_config);
+
+
+
+// --- TESTE DE ÁUDIO ---
+/* $mensagem = 'https://www.w3schools.com/html/horse.ogg'; // URL de áudio de teste
+$legenda = null; // Áudio não tem legenda
+$resultado = enviarMensagem($telefone_para_teste, $mensagem, $legenda, $api_config, $db_config); */
+
+
+
+// --- Mostra o resultado final da API ---
+echo "<hr><strong>Resposta Bruta Final da API:</strong> " . htmlspecialchars($resultado);
 
 ?>
