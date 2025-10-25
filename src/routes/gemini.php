@@ -1,95 +1,118 @@
 <?php
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
+header('Content-Type: application/json; charset=utf-8');
 
-// Carrega variáveis do .env sem Composer
-require_once __DIR__ . '/../helpers/env.php';
-loadEnv(__DIR__ . '/../../.env');
+include_once __DIR__ . '/../../conn.php';
 
-// Verifica se foi enviada uma requisição POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(["error" => "Método não permitido. Use POST."]);
-    exit;
+// Função para tratar conteúdo: remove tags HTML e adiciona quebras de linha entre parágrafos
+function limparConteudoParaTexto($html) {
+    // Substitui <br> e </p> por quebras de linha
+    $html = preg_replace('#<\s*(br|BR)\s*/?>#', "\n", $html);
+    $html = preg_replace('#<\s*/\s*p\s*>#', "\n\n", $html); // duas quebras de linha entre parágrafos
+
+    // Remove comentários HTML
+    $html = preg_replace('/<!--.*?-->/s', '', $html);
+
+    // Remove todas as outras tags
+    $texto = strip_tags($html);
+
+    // Normaliza múltiplos espaços e múltiplas quebras de linha
+    $texto = preg_replace("/[ \t]+/", " ", $texto);
+    $texto = preg_replace("/(\n\s*)+/", "\n", $texto);
+
+    return trim($texto);
 }
 
-// Lê JSON enviado
-$input = json_decode(file_get_contents("php://input"), true);
-$prompt = $input['prompt'] ?? null;
-$fileBase64 = $input['file'] ?? null;
-$mimeType = $input['mimeType'] ?? null;
-
-if (!$prompt && !$fileBase64) {
-    echo json_encode(["error" => "Prompt ou arquivo é obrigatório."]);
-    exit;
+// Função para buscar conteúdo por ID
+function obterConteudoPorId($conn, $id_label) {
+    $stmt = $conn->prepare("SELECT id, intro FROM kt7u_label WHERE id = ? LIMIT 1");
+    $stmt->bind_param("i", $id_label);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc() ?: null;
 }
 
-$apiKey = getenv('GEMINI_API_KEY') ?: '';
-if (!$apiKey) {
-    echo json_encode(["error" => "Chave da API GEMINI_API_KEY não encontrada no .env"]);
-    exit;
-}
+// Função para buscar todos conteúdos de um curso
+function obterConteudosPorCurso($conn, $id_curso) {
+    $stmt = $conn->prepare("SELECT id, name, intro FROM kt7u_label WHERE course = ?");
+    $stmt->bind_param("i", $id_curso);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-// Endpoint do Gemini
-$url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}";
+    $conteudo_html = "";
+    $conteudo_ids = [];
 
-// Monta conteúdo multimodal
-$contents = [];
-
-if ($prompt) {
-    $contents[] = ["parts" => [["text" => $prompt]]];
-}
-
-if ($fileBase64 && $mimeType) {
-    $part = [];
-
-    if (str_starts_with($mimeType, 'image/')) {
-        $part['image'] = [
-            "type" => $mimeType,
-            "data" => $fileBase64
-        ];
-    } elseif (str_starts_with($mimeType, 'audio/')) {
-        $part['audio'] = [
-            "type" => $mimeType,
-            "data" => $fileBase64
-        ];
+    while ($row = $result->fetch_assoc()) {
+        $conteudo_html .= $row['name'] . "\n\n"; // título seguido de duas quebras
+        $conteudo_html .= $row['intro'] . "\n\n"; // conteúdo seguido de duas quebras
+        $conteudo_ids[] = $row['id'];
     }
 
-    if ($part) {
-        $contents[] = ["parts" => [$part]];
-    }
+    if (empty($conteudo_ids)) return null;
+
+    return ['ids' => $conteudo_ids, 'intro' => $conteudo_html];
 }
 
-// Corpo da requisição
-$data = ["contents" => $contents];
+// Função para buscar usuário
+function obterUsuario($conn, $id_user) {
+    $stmt = $conn->prepare("SELECT username, firstname, lastname, phone2 FROM kt7u_user WHERE id = ? LIMIT 1");
+    $stmt->bind_param("i", $id_user);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc() ?: null;
+}
 
-// Envia para Gemini
-$ch = curl_init($url);
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_POST => true,
-    CURLOPT_HTTPHEADER => ["Content-Type: application/json"],
-    CURLOPT_POSTFIELDS => json_encode($data)
-]);
+// Função para buscar curso
+function obterCurso($conn, $id_curso) {
+    $stmt = $conn->prepare("SELECT fullname, shortname FROM kt7u_course WHERE id = ? LIMIT 1");
+    $stmt->bind_param("i", $id_curso);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc() ?: null;
+}
 
-$response = curl_exec($ch);
+// Captura parâmetros do POST (ou usa valores padrão)
+$id_user = isset($_POST['id_user']) ? intval($_POST['id_user']) : 3;
+$id_curso = isset($_POST['id_curso']) ? intval($_POST['id_curso']) : 2;
+$id_label = isset($_POST['id']) ? intval($_POST['id']) : null;
 
-if (curl_errno($ch)) {
-    echo json_encode(["error" => curl_error($ch)]);
-    curl_close($ch);
+// Consulta dados
+$usuario = obterUsuario($conn, $id_user);
+$curso = obterCurso($conn, $id_curso);
+
+if ($id_label) {
+    $conteudo = obterConteudoPorId($conn, $id_label);
+} else {
+    $conteudo = obterConteudosPorCurso($conn, $id_curso);
+}
+
+// Verifica se encontrou dados essenciais
+if (!$usuario || !$curso || !$conteudo) {
+    echo json_encode(['error' => 'Dados não encontrados']);
     exit;
 }
-curl_close($ch);
 
-// Decodifica resposta
-$json = json_decode($response, true);
-$outputText = $json['candidates'][0]['content']['parts'][0]['text'] ?? 'Sem resposta do Gemini.';
+// Trata conteúdo para WhatsApp (texto limpo, com quebras de linha entre parágrafos)
+$conteudo_texto = limparConteudoParaTexto($conteudo['intro']);
 
-$responseData = [
-    "prompt" => $prompt,
-    "response" => $outputText,
-    "file_attached" => ($fileBase64 && $mimeType) ? true : false,
-    "file_type" => $mimeType ?? null
+// Monta resposta final apenas com texto limpo
+$response = [
+    "status" => "sucesso",
+    "usuario" => [
+        "username" => $usuario['username'],
+        "firstname" => $usuario['firstname'],
+        "lastname" => $usuario['lastname'],
+        "phone" => $usuario['phone2']
+    ],
+    "curso" => [
+        "fullname" => $curso['fullname'],
+        "shortname" => $curso['shortname']
+    ],
+    "conteudo" => [
+        "id" => $id_label ?? implode(',', $conteudo['ids']),
+        "intro_texto" => $conteudo_texto
+    ]
 ];
 
-echo json_encode($responseData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+// Retorna JSON formatado
+echo json_encode($response, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+?>
