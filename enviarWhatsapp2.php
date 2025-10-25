@@ -2,30 +2,37 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
+/**
+ * ===================================================================
+ * CONFIGURAÇÕES DO BANCO DE DADOS
+ * ===================================================================
+ */
 $db_config = [
     'host' => 'localhost',
     'name' => 'u490880839_7xii0',
     'user' => 'u490880839_7ZrhP',
-    'pass' => '&Senha121&',
+    'pass' => '&Senha121&', // Sua senha
     'charset' => 'utf8mb4'
 ];
+// ===================================================================
+
 
 /**
  * ===================================================================
- * FUNÇÃO GENÉRICA PARA CHAMAR A API (cURL)
+ * FUNÇÃO GENÉRICA PARA CHAMAR A API (cURL) - (Sem alterações)
  * ===================================================================
  */
 function callZApi($api_url, $token, $payload)
 {
     $jsonData = json_encode($payload);
     $curl = curl_init();
-
     curl_setopt_array($curl, array(
         CURLOPT_URL            => $api_url,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_ENCODING       => "",
         CURLOPT_MAXREDIRS      => 10,
-        CURLOPT_TIMEOUT        => 30, // Timeout maior para envio de mídia
+        CURLOPT_TIMEOUT        => 30,
         CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
         CURLOPT_CUSTOMREQUEST  => "POST",
         CURLOPT_POSTFIELDS     => $jsonData,
@@ -33,13 +40,11 @@ function callZApi($api_url, $token, $payload)
             "client-token: $token",
             "content-type: application/json"
         ),
-        CURLOPT_SSL_VERIFYPEER => false, // Para WAMP/localhost. Mantenha se seu Hostinger tiver problemas
+        CURLOPT_SSL_VERIFYPEER => false,
     ));
-
     $response = curl_exec($curl);
     $err      = curl_error($curl);
     curl_close($curl);
-
     if ($err) {
         return json_encode(['error' => 'cURL Error', 'message' => $err]);
     } else {
@@ -49,31 +54,26 @@ function callZApi($api_url, $token, $payload)
 
 /**
  * ===================================================================
- * FUNÇÃO PARA SALVAR A MENSAGEM *ENVIADA* NO BANCO
+ * FUNÇÃO PARA SALVAR A MENSAGEM *ENVIADA* NO BANCO - (Sem alterações)
  * ===================================================================
  */
 function salvarEnvioNoDB($db_config, $api_response, $sender_phone, $receiver_phone, $message_text, $media_type, $media_url)
 {
-    global $db_host, $db_name, $db_user, $db_pass, $charset;
     $dsn = "mysql:host={$db_config['host']};dbname={$db_config['name']};charset={$db_config['charset']}";
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES   => false,
     ];
-
     try {
         $pdo = new PDO($dsn, $db_config['user'], $db_config['pass'], $options);
-        
         $message_id = $api_response['zaapId'] ?? 'envio-' . microtime(true);
-        $sender_name = "Você (Sistema)"; // Você está enviando
-        $api_timestamp = round(microtime(true) * 1000); // Agora
-
+        $sender_name = "Você (Sistema)";
+        $api_timestamp = round(microtime(true) * 1000);
         $sql = "INSERT IGNORE INTO whatsapp_messages 
                     (message_id, sender_phone, receiver_phone, message_text, sender_name, api_timestamp, media_type, media_url)
                 VALUES 
                     (:message_id, :sender_phone, :receiver_phone, :message_text, :sender_name, :api_timestamp, :media_type, :media_url)";
-        
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             'message_id' => $message_id,
@@ -85,9 +85,7 @@ function salvarEnvioNoDB($db_config, $api_response, $sender_phone, $receiver_pho
             'media_type' => $media_type,
             'media_url' => $media_url
         ]);
-
         return "<h3 style='color:green;'>Mensagem ENVIADA salva no banco com sucesso!</h3>";
-
     } catch (\PDOException $e) {
         return "<h3 style='color:red;'>ERRO AO SALVAR NO BANCO: " . $e->getMessage() . "</h3>";
     }
@@ -100,7 +98,7 @@ function salvarEnvioNoDB($db_config, $api_response, $sender_phone, $receiver_pho
  * ===================================================================
  */
 
-// --- 1. ENVIAR TEXTO ---
+// --- 1. ENVIAR TEXTO (Correta) ---
 function enviaTexto($phone, $message, $api_config, $db_config)
 {
     $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-text';
@@ -108,56 +106,76 @@ function enviaTexto($phone, $message, $api_config, $db_config)
         'phone' => $phone,
         'message' => $message
     ];
-    
     $resultado = callZApi($api_url, $api_config['token_security'], $payload);
     $resposta_array = json_decode($resultado, true);
-
-    // Se a API enviou, salva no banco
     if (isset($resposta_array['zaapId'])) {
-        echo salvarEnvioNoDB(
-            $db_config, 
-            $resposta_array, 
-            $api_config['seu_telefone_conectado'], // sender_phone (Você)
-            $phone,                               // receiver_phone (Cliente)
-            $message,                             // message_text
-            'text',                               // media_type
-            null                                  // media_url
-        );
+        echo salvarEnvioNoDB($db_config, $resposta_array, $api_config['seu_telefone_conectado'], $phone, $message, 'text', null);
     }
     return $resultado;
 }
 
-// --- 2. ENVIAR IMAGEM ---
+// --- 2. ENVIAR IMAGEM (CORRIGIDA) ---
 function enviaImagem($phone, $public_image_url, $caption, $api_config, $db_config)
 {
-    // ASSUMINDO O ENDPOINT /send-image
     $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-image'; 
     $payload = [
         'phone' => $phone,
-        'imageUrl' => $public_image_url, // ASSUMINDO O PARÂMETRO 'imageUrl'
+        'image' => $public_image_url, // <-- CORREÇÃO AQUI (de 'imageUrl' para 'image')
         'caption' => $caption
     ];
     
     $resultado = callZApi($api_url, $api_config['token_security'], $payload);
     $resposta_array = json_decode($resultado, true);
 
-    // Se a API enviou, salva no banco
+    // Linha de Debug (pode apagar depois)
+    echo "<strong>DEBUG (enviaImagem): Resposta completa da API:</strong> " . htmlspecialchars($resultado) . "<hr>";
+
     if (isset($resposta_array['zaapId'])) {
-        echo salvarEnvioNoDB(
-            $db_config, 
-            $resposta_array, 
-            $api_config['seu_telefone_conectado'], // sender_phone (Você)
-            $phone,                               // receiver_phone (Cliente)
-            $caption,                             // message_text (legenda)
-            'image/jpeg',                         // media_type (apenas um palpite)
-            $public_image_url                     // media_url (link público que você enviou)
-        );
+        echo salvarEnvioNoDB($db_config, $resposta_array, $api_config['seu_telefone_conectado'], $phone, $caption, 'image/jpeg', $public_image_url);
     }
     return $resultado;
 }
 
-// (Você pode adicionar enviaAudio e enviaVideo aqui, copiando o modelo de enviaImagem)
+// --- 3. ENVIAR ÁUDIO (NOVA FUNÇÃO) ---
+function enviaAudio($phone, $public_audio_url, $api_config, $db_config)
+{
+    $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-audio'; 
+    $payload = [
+        'phone' => $phone,
+        'audio' => $public_audio_url, // <-- PARÂMETRO CORRETO: 'audio'
+    ];
+    
+    $resultado = callZApi($api_url, $api_config['token_security'], $payload);
+    $resposta_array = json_decode($resultado, true);
+    
+    echo "<strong>DEBUG (enviaAudio): Resposta completa da API:</strong> " . htmlspecialchars($resultado) . "<hr>";
 
+    if (isset($resposta_array['zaapId'])) {
+        echo salvarEnvioNoDB($db_config, $resposta_array, $api_config['seu_telefone_conectado'], $phone, null, 'audio/ogg', $public_audio_url);
+    }
+    return $resultado;
+}
+
+// --- 4. ENVIAR VÍDEO (NOVA FUNÇÃO) ---
+function enviaVideo($phone, $public_video_url, $caption, $api_config, $db_config)
+{
+    $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-video'; 
+    $payload = [
+        'phone' => $phone,
+        'video' => $public_video_url, // <-- PARÂMETRO CORRETO: 'video'
+        'caption' => $caption
+    ];
+    
+    $resultado = callZApi($api_url, $api_config['token_security'], $payload);
+    $resposta_array = json_decode($resultado, true);
+    
+    echo "<strong>DEBUG (enviaVideo): Resposta completa da API:</strong> " . htmlspecialchars($resultado) . "<hr>";
+
+    if (isset($resposta_array['zaapId'])) {
+        echo salvarEnvioNoDB($db_config, $resposta_array, $api_config['seu_telefone_conectado'], $phone, $caption, 'video/mp4', $public_video_url);
+    }
+    return $resultado;
+}
 
 /**
  * ===================================================================
@@ -178,23 +196,30 @@ $api_config = [
 $telefone_para_teste = '5521992491608'; // O número do CLIENTE
 
 
-// --- TESTE 1: ENVIAR TEXTO (como antes) ---
-/*
-echo "<h2>Enviando Texto...</h2>";
-$mensagem_para_teste = 'Teste de envio de texto refatorado! ' . date('H:i:s');
-$resultado_texto = enviaTexto($telefone_para_teste, $mensagem_para_teste, $api_config, $db_config);
-echo "<strong>Resposta Bruta da API:</strong> " . htmlspecialchars($resultado_texto);
-*/
+// --- ESCOLHA O TESTE QUE QUER RODAR ---
 
-
-// --- TESTE 2: ENVIAR IMAGEM ---
-// PASSO 1: Envie uma foto para sua pasta /api_whatsapp/uploads/ (ex: 'foto_teste.jpg')
-// PASSO 2: Coloque a URL pública dela aqui
-$url_publica_da_imagem = 'https://studio401.com.br/api_whatsapp/uploads/Teste2.png'; // << MUDE AQUI
-$legenda_da_imagem = 'Olha a imagem que estou te enviando!';
-
-echo "<h2>Enviando Imagem...</h2>";
+/* // --- TESTE DE IMAGEM (COM URL PÚBLICA DO IMGUR) ---
+echo "<h2>Enviando Imagem (Teste do Imgur)...</h2>";
+$url_publica_da_imagem = 'hhttps://studio401.com.br/api_whatsapp/uploads/Teste2.png'; // Imagem de teste 100% pública
+$legenda_da_imagem = 'Teste com código CORRIGIDO. Esta deve chegar. ' . date('H:i:s');
 $resultado_imagem = enviaImagem($telefone_para_teste, $url_publica_da_imagem, $legenda_da_imagem, $api_config, $db_config);
-echo "<strong>Resposta Bruta da API:</strong> " . htmlspecialchars($resultado_imagem);
+echo "<strong>Resposta Bruta da API:</strong> " . htmlspecialchars($resultado_imagem); */
 
+
+
+// --- TESTE DE VÍDEO (URL PÚBLICA) ---
+echo "<h2>Enviando Vídeo...</h2>";
+$url_publica_video = 'https://studio401.com.br/api_whatsapp/uploads/video1.mp4'; // URL de vídeo de teste
+$legenda_video = 'Teste de envio de vídeo. ' . date('H:i:s');
+$resultado_video = enviaVideo($telefone_para_teste, $url_publica_video, $legenda_video, $api_config, $db_config);
+echo "<strong>Resposta Bruta da API:</strong> " . htmlspecialchars($resultado_video);
+
+
+/*
+// --- TESTE DE ÁUDIO (URL PÚBLICA) ---
+echo "<h2>Enviando Áudio...</h2>";
+$url_publica_audio = 'https://www.w3schools.com/html/horse.ogg'; // URL de áudio de teste
+$resultado_audio = enviaAudio($telefone_para_teste, $url_publica_audio, $api_config, $db_config);
+echo "<strong>Resposta Bruta da API:</strong> " . htmlspecialchars($resultado_audio);
+*/
 ?>
