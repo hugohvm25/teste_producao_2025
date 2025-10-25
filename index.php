@@ -8,75 +8,56 @@
         body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f9; }
         h1 { color: #333; }
         form { margin-bottom: 20px; }
-        textarea, input[type="file"] { width: 100%; margin-bottom: 10px; }
+        input[type="number"] { width: 100%; margin-bottom: 10px; }
         button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-        pre { background: #eee; padding: 15px; border-radius: 5px; }
+        pre { background: #eee; padding: 15px; border-radius: 5px; white-space: pre-wrap; }
     </style>
 </head>
 <body>
     <h1>Teste API Gemini Multimodal</h1>
-    
-    <form id="geminiForm">
-        <label for="prompt">Digite seu prompt:</label><br>
-        <textarea id="prompt" name="prompt" placeholder="Ex: Explique esta imagem"></textarea><br>
 
-        <label for="file">Anexo (imagem ou áudio):</label><br>
-        <input type="file" id="file" name="file"><br><br>
-
-        <button type="submit">Enviar</button>
+    <!-- Adicionado id e removido action para evitar redirect -->
+    <form id="geminiForm" onsubmit="return false;">
+        <label>Escolha o conteúdo (ID):</label>
+        <input type="number" id="id" name="id" value="1" />
+        <button id="sendBtn" type="button">Enviar</button>
     </form>
 
     <h2>Resposta:</h2>
     <pre id="response">Aqui aparecerá a resposta...</pre>
 
     <script>
-        const form = document.getElementById('geminiForm');
+        const btn = document.getElementById('sendBtn');
         const responseBox = document.getElementById('response');
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const prompt = document.getElementById('prompt').value;
-            const fileInput = document.getElementById('file');
-            const file = fileInput.files[0];
-
-            if (!prompt && !file) return alert("Digite um prompt ou envie um arquivo!");
+        btn.addEventListener('click', async () => {
+            const id = document.getElementById('id').value.trim();
+            if (!id) {
+                alert("Informe um ID válido!");
+                return;
+            }
 
             responseBox.textContent = "Carregando...";
 
-            let fileData = null;
-            if (file) {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = async () => {
-                    fileData = reader.result.split(',')[1]; // remove prefix data:image/...;base64,
-                    await sendRequest(prompt, fileData, file.type);
-                };
-            } else {
-                await sendRequest(prompt, null, null);
-            }
-        });
-
-        async function sendRequest(prompt, base64File, mimeType) {
             try {
-                const body = { prompt };
-                if (base64File) {
-                    body.file = base64File;
-                    body.mimeType = mimeType;
-                }
-
                 const res = await fetch('src/routes/gemini.php', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'id=' + encodeURIComponent(id)
                 });
 
-                const data = await res.json();
-                responseBox.textContent = JSON.stringify(data, null, 2);
+                const data = await res.text();
+
+                try {
+                    const json = JSON.parse(data);
+                    responseBox.textContent = JSON.stringify(json, null, 2);
+                } catch {
+                    responseBox.textContent = data;
+                }
             } catch (err) {
                 responseBox.textContent = "Erro: " + err.message;
             }
-        }
+        });
     </script>
 </body>
 </html>
