@@ -4,6 +4,7 @@
 
     $id_curso = 2;
 
+    // obtem os dados do curso
     $sql = "SELECT * FROM kt7u_course WHERE id = ? ";
 
     $stmt = mysqli_prepare($conn, $sql);
@@ -26,6 +27,7 @@
         echo "<br>";
     }
 
+    // obtem os dados do usuario
     $id_user = 3;
 
     $sql = "SELECT * FROM kt7u_user WHERE id = ? ";
