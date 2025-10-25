@@ -2,9 +2,9 @@
 
 // 1. Defina sua Chave de API
 // NUNCA exponha esta chave publicamente. Use variáveis de ambiente em produção.
-$apiKey = 'AIzaSyDsuRV2JKGEAO0QPOnS8N1ALYnrbzGeY2M';
+$apiKey = 'AIzaSyAE1zNhiQxRM6yR7_gnzZzIXTrZ4qjKnmk';
 
-$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=' . $apiKey;
+$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $apiKey;
 
 // 3. Defina o prompt e os dados da requisição
 $prompt = "Escreva uma breve descrição para um produto: um café gourmet do Brasil.";
