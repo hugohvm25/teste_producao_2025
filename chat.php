@@ -2,7 +2,7 @@
 
 // 1. Defina sua Chave de API
 // NUNCA exponha esta chave publicamente. Use variáveis de ambiente em produção.
-$apiKey = 'AIzaSyAHPLANtxv04H7GWMShCdgZTVaKNvsdv1M';
+$apiKey = 'AIzaSyDsuRV2JKGEAO0QPOnS8N1ALYnrbzGeY2M';
 
 $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=' . $apiKey;
 

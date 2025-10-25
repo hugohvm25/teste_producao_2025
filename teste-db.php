@@ -53,3 +53,27 @@
         echo $row['phone2'];
         echo "<br>";
     }
+
+    $course = 2;
+
+    $sql = "SELECT * FROM kt7u_label WHERE course = ? ";
+
+    $stmt = mysqli_prepare($conn, $sql);
+
+    mysqli_stmt_bind_param($stmt, "s", $course);
+
+    mysqli_stmt_execute($stmt);
+
+    $result = mysqli_stmt_get_result($stmt);
+
+    $row    = mysqli_fetch_array($result);
+
+    if(!empty($row))
+    {
+        extract($row);
+        
+        echo $row['name'];
+        echo "<br>";
+        echo $row['intro'];
+        echo "<br>";
+    }
