@@ -2,13 +2,6 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-
-/**
- * ===================================================================
- * CONFIGURAÇÕES DO BANCO DE DADOS
- * !! TROQUE ESTA SENHA IMEDIATAMENTE !!
- * ===================================================================
- */
 $db_config = [
     'host' => 'localhost',
     'name' => 'u490880839_7xii0',
@@ -16,20 +9,10 @@ $db_config = [
     'pass' => '&Senha121&', // <-- TROQUE A SENHA!
     'charset' => 'utf8mb4'
 ];
-// ===================================================================
-
-
-/**
- * ===================================================================
- * NOVA FUNÇÃO "MESTRE" INTELIGENTE
- * Ela reconhece o tipo de mensagem e chama a função correta.
- * ===================================================================
- */
 function enviarMensagem($phone, $message_or_url, $api_config, $db_config, $caption = null)
 {
     echo "<h1>Disparando Mensagem...</h1>";
-    
-    // Listas de extensões conhecidas
+
     $image_exts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     $video_exts = ['mp4', 'mov', '3gp', 'mkv'];
     $audio_exts = ['ogg', 'mp3', 'aac', 'opus', 'wav', 'm4a'];
@@ -69,16 +52,6 @@ function enviarMensagem($phone, $message_or_url, $api_config, $db_config, $capti
         return enviaTexto($phone, $message_or_url, $api_config, $db_config);
     }
 }
-
-
-/**
- * ===================================================================
- * FUNÇÕES "TRABALHADORAS" (Texto, Imagem, Áudio, Vídeo)
- * (Estas funções agora são chamadas pela função 'enviarMensagem')
- * ===================================================================
- */
-
-// --- 1. ENVIAR TEXTO ---
 function enviaTexto($phone, $message, $api_config, $db_config)
 {
     $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-text';
@@ -132,14 +105,6 @@ function enviaVideo($phone, $public_video_url, $caption, $api_config, $db_config
     }
     return $resultado;
 }
-
-
-/**
- * ===================================================================
- * FUNÇÕES AUXILIARES (cURL e Salvar no DB)
- * (Sem alterações)
- * ===================================================================
- */
 
 function callZApi($api_url, $token, $payload)
 {
