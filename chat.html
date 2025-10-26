@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Chat</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- Configurações Globais --- */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f7f6; /* Um cinza bem claro */
+            margin: 0;
+            padding: 20px;
+            display: grid;
+            place-items: center; /* Centraliza o card na tela */
+            min-height: 90vh;
+        }
+
+        /* --- O Card Principal --- */
+        .chat-container {
+            width: 100%;
+            max-width: 500px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.07);
+            overflow: hidden; /* Garante que os cantos arredondados funcionem */
+        }
+
+        /* --- Cabeçalho do Card --- */
+        .chat-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid #eee;
+            background-color: #fafafa;
+        }
+        .chat-header h1 {
+            margin: 0;
+            font-size: 22px;
+            color: #1a1a1a;
+        }
+        .chat-header p {
+            margin: 5px 0 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* --- Formulário --- */
+        form {
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px; /* Espaçamento entre os campos */
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        /* Estilo unificado para inputs e textarea */
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box; /* Evita problemas de tamanho */
+            transition: all 0.2s ease;
+        }
+
+        textarea {
+            resize: vertical; /* Permite ao usuário aumentar a altura */
+            min-height: 100px;
+        }
+
+        /* Efeito de "foco" (quando clica no campo) */
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #007bff; /* Um azul amigável */
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.15);
+        }
+
+        /* --- Botão de Envio --- */
+        button {
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+            background-color: #007bff; /* Azul primário */
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            
+            /* Para alinhar o ícone (emoji) */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background-color: #005ecf; /* Azul um pouco mais escuro */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        
+        <div class="chat-header">
+            <h1>Painel de Envio</h1>
+            <p>Para: Fael (5521...91608)</p>
+        </div>
+
+        <form action="processar_envio.php" method="POST">
+            
+            <div class="form-group">
+                <label for="mensagem">Mensagem ou URL de Mídia</label>
+                <textarea id="mensagem" name="mensagem" placeholder="Digite 'Olá' ou cole uma URL de .jpg, .mp4..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="legenda">Legenda (opcional)</label>
+                <input type="text" id="legenda" name="legenda" placeholder="Digite uma legenda para a imagem ou vídeo">
+            </div>
+
+            <button type="submit">
+                <span>Enviar</span>
+                <span role="img" aria-label="enviar">✈️</span>
+            </button>
+        </form>
+    </div>
+
+</body>
+</html>
