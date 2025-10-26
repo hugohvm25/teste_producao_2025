@@ -6,17 +6,15 @@ $db_config = [
     'host' => 'localhost',
     'name' => 'u490880839_7xii0',
     'user' => 'u490880839_7ZrhP',
-    'pass' => '&Senha121&', // <-- TROQUE A SENHA!
+    'pass' => '&Senha121&',
     'charset' => 'utf8mb4'
 ];
 function enviarMensagem($phone, $message_or_url, $api_config, $db_config, $caption = null)
 {
     echo "<h1>Disparando Mensagem...</h1>";
-
     $image_exts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     $video_exts = ['mp4', 'mov', '3gp', 'mkv'];
     $audio_exts = ['ogg', 'mp3', 'aac', 'opus', 'wav', 'm4a'];
-
     // 1. Verifica se é uma URL (http:// ou https://)
     if (strpos(strtolower($message_or_url), 'http://') === 0 || strpos(strtolower($message_or_url), 'https://') === 0) {
         
@@ -47,7 +45,7 @@ function enviarMensagem($phone, $message_or_url, $api_config, $db_config, $capti
         }
 
     } else {
-        // 2. Não é uma URL, então é texto.
+        // Não é uma URL, então é texto!
         echo "<h2>Reconhecido: TEXTO</h2>";
         return enviaTexto($phone, $message_or_url, $api_config, $db_config);
     }
@@ -63,8 +61,7 @@ function enviaTexto($phone, $message, $api_config, $db_config)
     }
     return $resultado;
 }
-
-// --- 2. ENVIAR IMAGEM ---
+// --- ENVIAR IMAGEM ---
 function enviaImagem($phone, $public_image_url, $caption, $api_config, $db_config)
 {
     $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-image'; 
@@ -77,8 +74,7 @@ function enviaImagem($phone, $public_image_url, $caption, $api_config, $db_confi
     }
     return $resultado;
 }
-
-// --- 3. ENVIAR ÁUDIO ---
+// --- ENVIAR ÁUDIO ---
 function enviaAudio($phone, $public_audio_url, $api_config, $db_config)
 {
     $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-audio'; 
@@ -91,8 +87,7 @@ function enviaAudio($phone, $public_audio_url, $api_config, $db_config)
     }
     return $resultado;
 }
-
-// --- 4. ENVIAR VÍDEO ---
+// --- ENVIAR VÍDEO ---
 function enviaVideo($phone, $public_video_url, $caption, $api_config, $db_config)
 {
     $api_url = $api_config['base_url'] . $api_config['token_url'] . '/send-video'; 
@@ -105,7 +100,6 @@ function enviaVideo($phone, $public_video_url, $caption, $api_config, $db_config
     }
     return $resultado;
 }
-
 function callZApi($api_url, $token, $payload)
 {
     $jsonData = json_encode($payload);
@@ -134,7 +128,6 @@ function callZApi($api_url, $token, $payload)
         return $response;
     }
 }
-
 function salvarEnvioNoDB($db_config, $api_response, $sender_phone, $receiver_phone, $message_text, $media_type, $media_url)
 {
     $dsn = "mysql:host={$db_config['host']};dbname={$db_config['name']};charset={$db_config['charset']}";
@@ -168,5 +161,4 @@ function salvarEnvioNoDB($db_config, $api_response, $sender_phone, $receiver_pho
         return "<h3 style='color:red;'>ERRO AO SALVAR NO BANCO: " . $e->getMessage() . "</h3>";
     }
 }
-
 ?>

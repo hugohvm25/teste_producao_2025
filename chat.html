@@ -3,14 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Chat</title>
-    
+    <title>Painel de Chat</title>    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
     <style>
-        /* (Todo o seu CSS anterior continua aqui, sem alterações) */
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: #f4f7f6;
@@ -102,16 +99,12 @@
     </style>
 </head>
 <body>
-
-    <div class="chat-container">
-        
+    <div class="chat-container">        
         <div class="chat-header">
             <h1>Painel de Envio</h1>
             <p>Selecione o destinatário e envie sua mensagem.</p>
         </div>
-
-        <form action="processar_envio.php" method="POST">
-            
+        <form action="processar_envio.php" method="POST">            
             <div class="form-group">
                 <label for="numero">Enviar Para (Telefone)</label>
                 <input type="text" id="numero" name="numero" placeholder="Ex: 5521992491608" required>

@@ -1,13 +1,9 @@
 <?php
-// Mostra todos os erros
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// 1. Inclui o seu "cérebro"
 require_once 'funcoes_api.php';
-
-// 2. Pega os dados que vieram do formulário
 $telefone_para_enviar = $_POST['numero'] ?? null; // <-- VAMOS USAR ESTE NÚMERO
 $texto_para_enviar = $_POST['texto_mensagem'] ?? null;
 $legenda_para_enviar = $_POST['legenda'] ?? null;
@@ -51,26 +47,22 @@ if ($arquivo_info && $arquivo_info['error'] == 0) {
             ob_end_clean(); // Limpa o buffer
             die("Erro CRÍTICO: Falha ao criar a pasta do chat em '$user_upload_dir_path'. Verifique as permissões da pasta 'uploads'.");
         }
-    }
-     
+    }     
     $filename = basename($arquivo_info['name']);
     $safe_filename = preg_replace("/[^a-zA-Z0-9._-]/", "_", $filename);
-    $safe_filename = uniqid() . '-' . $safe_filename; 
-    
-    // ATUALIZADO: Salva o arquivo DENTRO da pasta do chat
+    $safe_filename = uniqid() . '-' . $safe_filename;     
+    //Salva o arquivo DENTRO da pasta do chat
     $destination = $user_upload_dir_path . '/' . $safe_filename;
 
-    if (move_uploaded_file($arquivo_info['tmp_name'], $destination)) {
-        
+    if (move_uploaded_file($arquivo_info['tmp_name'], $destination)) {        
         chmod($destination, 0644); // Define a permissão de leitura pública
-
         $scheme = 'https://'; 
         $host = $_SERVER['HTTP_HOST']; 
         $script_path = dirname($_SERVER['SCRIPT_NAME']); 
-        
+
         // ATUALIZADO: A URL pública agora inclui a pasta do chat
-        $conteudo_para_enviar = $scheme . $host . $script_path . '/uploads/' . $chat_folder_name . '/' . $safe_filename;
         
+        $conteudo_para_enviar = $scheme . $host . $script_path . '/uploads/' . $chat_folder_name . '/' . $safe_filename;        
         echo "<strong>DEBUG (Upload):</strong> Pasta do chat: $user_upload_dir_path\n";
         echo "<strong>DEBUG (Upload):</strong> Arquivo salvo em: $destination\n";
         echo "<strong>DEBUG (Upload):</strong> Permissão definida para 0644.\n";
@@ -78,13 +70,11 @@ if ($arquivo_info && $arquivo_info['error'] == 0) {
         
         if (empty($legenda_para_enviar)) {
             $legenda_para_enviar = $filename; 
-        }
-        
+        }        
     } else {
         ob_end_clean(); // Limpa o buffer
         die("Erro: Falha ao mover o arquivo enviado. Verifique as permissões da pasta '$user_upload_dir_path'.");
-    }
-    
+    }    
 } else {
     // NENHUM ARQUIVO FOI ENVIADO
     $conteudo_para_enviar = $texto_para_enviar;
@@ -94,7 +84,6 @@ if (empty($conteudo_para_enviar)) {
     ob_end_clean(); // Limpa o buffer
     die("Erro: Você deve enviar uma 'Mensagem de Texto' OU um 'Arquivo Local'.");
 }
-
 // 5. CHAMA A SUA FUNÇÃO UNIVERSAL!
 $resultado_json = enviarMensagem(
     $telefone_para_enviar, 
@@ -103,19 +92,15 @@ $resultado_json = enviarMensagem(
     $db_config,
     $legenda_para_enviar
 );
-
 // 6. PEGA TUDO QUE FOI "ECHADO"
 $debug_html = ob_get_clean();
-
 // 7. Analisa o resultado final
 $resposta_array = json_decode($resultado_json, true);
 $sucesso = isset($resposta_array['zaapId']);
-
 // 8. Define as variáveis de status
 $status_titulo = $sucesso ? "Mensagem Enviada!" : "Falha no Envio!";
 $status_icone = $sucesso ? "✅" : "❌";
 $status_classe_css = $sucesso ? "status-success" : "status-error";
-
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
